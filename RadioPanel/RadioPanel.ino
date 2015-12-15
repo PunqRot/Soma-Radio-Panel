@@ -1,33 +1,50 @@
+//
+// SomaFM Radio Panel
+//
+
 #include <Adafruit_NeoPixel.h>
 #include <ClickEncoder.h>
 #include <TimerOne.h>
+#include <Wire.h>
 
 #define PIX_PIN 6
 #define PIN_COUNT 7
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIN_COUNT, PIX_PIN, NEO_GRB + NEO_KHZ800);
 
+// Rotary encoders for volume and channel
 ClickEncoder *station;
 ClickEncoder *volume;
 int16_t last, value;
 
+// Variables for the button presses.
 int clickCount=0;
+int holdCount=0;
 
+// Setup interrupts for encoders
 void timerIsr() {
   station->service();
   volume->service();
 }
 
 void setup() {
+  // For debugging via Serial Monitor
   Serial.begin(9600);
+  
+  // I2C Setup
+  Wire.begin(45); // Join I2C bus as 45
+  Wire.onReceive(processResponse); // register event
+
+  // Neopixel Strip Setup
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
 
+  // Create both rotary encoders
   station = new ClickEncoder(A1, A0, A2, 4);
   volume = new ClickEncoder(A3, A4, A5);
-
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
   
+  // Initial values of globals
   last = -1;
 }
 
@@ -54,8 +71,20 @@ void loop() {
     #define VERBOSECASE(label) case label: Serial.println(#label); break;
     switch (b) {
       VERBOSECASE(ClickEncoder::Pressed);
-      VERBOSECASE(ClickEncoder::Held)
-      VERBOSECASE(ClickEncoder::Released)
+      //VERBOSECASE(ClickEncoder::Held)
+      //VERBOSECASE(ClickEncoder::Released)
+      case ClickEncoder::Held:
+          if(holdCount > 5000) {
+            Serial.println("Initiate Shutdown");
+          } else {
+            holdCount++;
+            Serial.print("Held for: ");
+            Serial.println(holdCount);
+          }
+        break;
+      case ClickEncoder::Released:
+          holdCount = 0;
+        break;      
       //VERBOSECASE(ClickEncoder::Clicked)
       case ClickEncoder::Clicked:
           clickCount++;
@@ -72,6 +101,9 @@ void loop() {
         break;
     }
   }    
+}
+
+void processResponse(int howMany) {
 }
 
 void showPixel(int which) {
