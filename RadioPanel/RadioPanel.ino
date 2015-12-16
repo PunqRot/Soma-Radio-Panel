@@ -27,16 +27,17 @@ void timerIsr() {
 }
 
 void setup() {
+  // Neopixel Strip Setup
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+  rainbow(10);
+
   // For debugging via Serial Monitor
   Serial.begin(9600);
   
   // I2C Setup
-  Wire.begin(45); // Join I2C bus as 45
+  Wire.begin(); // Join I2C bus as 45
   Wire.onReceive(processResponse); // register event
-
-  // Neopixel Strip Setup
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
 
   // Create both rotary encoders
   station = new ClickEncoder(A1, A0, A2, 4);
@@ -134,6 +135,11 @@ void showPixel(int which) {
   // Set the pixel
   strip.setPixelColor(which, pixelColor);
   strip.show();
+
+  Serial.print("Setting pixel ");
+  Serial.print(which);
+  Serial.print(" to ");
+  Serial.println(pixelColor);  
 }
 //
 // NEOPIXEL CODE BITS
