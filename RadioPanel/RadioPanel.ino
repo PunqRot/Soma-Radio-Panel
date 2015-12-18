@@ -1,5 +1,5 @@
 //
-// SomaFM Radio Panel
+// Internet Radio Panel
 //
 
 #include <Adafruit_NeoPixel.h>
@@ -7,9 +7,13 @@
 #include <TimerOne.h>
 #include <Wire.h>
 
-#define PIX_PIN 6
+#define PIX_PIN 3
 #define PIN_COUNT 7
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIN_COUNT, PIX_PIN, NEO_GRB + NEO_KHZ800);
+
+// Wire IDs
+#define BOARDID = 0x17 // The I/O Board
+#define MAINID = 0x03 // The Host Computer
 
 // Rotary encoders for volume and channel
 ClickEncoder *station;
@@ -36,7 +40,7 @@ void setup() {
   Serial.begin(9600);
   
   // I2C Setup
-  Wire.begin(); // Join I2C bus as 45
+  Wire.begin(BOARDID); // Join I2C bus
   Wire.onReceive(processResponse); // register event
 
   // Create both rotary encoders
@@ -47,25 +51,36 @@ void setup() {
   
   // Initial values of globals
   last = -1;
-}
+} // void setup()
 
 void loop() {  
+  
+  
   value += station->getValue();
+  // Changes in channel
   if(value > 6) {
     value = 6;
   } else if(value < 0) {
     value = 0;
   }
-  
   if (value != last) {
     last = value;
+    
+    // Send the 
+    Wire.beginTransmission(MAINID);
+    Wire.write("V");
+    Wire.write(value);
+    Wire.endTransmission();
+  
     Serial.print("Encoder Value: ");
     Serial.println(value);
-    Serial.write(value);
-        
-    showPixel(value);
+    Serial.write(value);        
   }
   
+  
+  //
+  // Volume Button Click  
+  //
   ClickEncoder::Button b = station->getButton();
   if (b != ClickEncoder::Open) {
     Serial.print("Button: ");
@@ -100,12 +115,63 @@ void loop() {
           Serial.print("  Acceleration is ");
           Serial.println((station->getAccelerationEnabled()) ? "enabled" : "disabled");
         break;
-    }
-  }    
-}
+    } // switch (b)
+  } // if (b != ClickEncoder::Open)
+  
+} // void loop()
 
-void processResponse(int howMany) {
-}
+void processResponse(int byteCount) {
+  int volT, volO, volume, channel;
+  
+  while(Wire.available()) {
+    // Pull the action code
+    char action = Wire.read();
+    
+    // Choose your own adventure
+    switch(action) {
+      
+      // Set the volume display
+      case 'v':
+          volT = Wire.read();
+          volO = Wire.read();
+          volume = (volT * 10) + volO;
+          displayVolume(volume);
+        break;
+      
+      // Set the channel display 
+      case 'c':
+          channel = Wire.read();
+          displayChannel(channel);
+        break;
+        
+      // Double rainbow!
+      case 'r':
+        break;
+  
+      default:
+        break; 
+        
+    } // switch
+  } // while
+} // void processResponse(int byteCount)
+
+void displayVolume(int volume) {
+  int volInc = 14; // roughly 1/7th of 100
+  int volFull = volume / 14; // How many at full brightness
+  int volPart = (volume%14)/14 * 255; // Percentage of full to light last pixel
+
+  int i = 0; // iniitalize the loop but keep the scope outside for the after bit  
+  for(i=0 ; i < volFull ; i++) {
+    strip.setPixelColor(i, strip.Color(0, 128, 0));
+  }
+  strip.setPixelColor(i, strip.Color(0, volPart, 0)); 
+  strip.show();
+} // void displayVolume()
+
+void displayChannel(int channel) {
+  strip.setPixelColor(channel, strip.Color(128, 0, 0));
+  strip.show();
+} // void displayChannel()
 
 void showPixel(int which) {
   uint32_t pixelColor;
@@ -140,7 +206,8 @@ void showPixel(int which) {
   Serial.print(which);
   Serial.print(" to ");
   Serial.println(pixelColor);  
-}
+} // void showPixel()
+
 //
 // NEOPIXEL CODE BITS
 //
