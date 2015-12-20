@@ -12,13 +12,14 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIN_COUNT, PIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // Wire IDs
-#define BOARDID = 0x17 // The I/O Board
-#define MAINID = 0x03 // The Host Computer
+#define BOARDID 0x17 // The I/O Board
+#define MAINID  0x03 // The Host Computer
 
 // Rotary encoders for volume and channel
 ClickEncoder *station;
 ClickEncoder *volume;
-int16_t last, value;
+int16_t lastVol, currentVol;
+int16_t lastCh, currentCh;
 
 // Variables for the button presses.
 int clickCount=0;
@@ -34,7 +35,7 @@ void setup() {
   // Neopixel Strip Setup
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
-  rainbow(10);
+  //rainbow(10);
 
   // For debugging via Serial Monitor
   Serial.begin(9600);
@@ -50,38 +51,157 @@ void setup() {
   Timer1.attachInterrupt(timerIsr); 
   
   // Initial values of globals
-  last = -1;
+  lastCh = -1;
+  lastVol = -1;
 } // void setup()
 
 void loop() {  
   
+  sendStation();
+  sendVolume();
+  processVolButton();
+  processChButton();
   
-  value += station->getValue();
-  // Changes in channel
-  if(value > 6) {
-    value = 6;
-  } else if(value < 0) {
-    value = 0;
+  
+} // void loop()
+
+
+void processResponseOld(int byteCount) {
+  
+  while(Wire.available()) {
+    // Pull the action code
+    int input = Wire.read();
+    Serial.print("Received: ");
+    Serial.println(input);
   }
-  if (value != last) {
-    last = value;
+}    
+
+void processResponse(int byteCount) {
+  int volT, volO, volume, channel;
+  
+  while(Wire.available()) {
+    // Pull the action code
+    char action = Wire.read();
+    Serial.print("Action: ");
+    Serial.println(action);
     
-    // Send the 
+    // Choose your own adventure
+    switch(action) {
+      
+      // Set the volume display
+      case 'v': // Volume
+          //volT = Wire.read();
+          //volO = Wire.read();
+          volume = Wire.read();
+          Serial.print("Volume: ");
+          //Serial.print(volT);
+          //Serial.print(volO);
+          //volume = (volT * 10) + volO;
+          Serial.print(" = ");
+          Serial.println(volume);
+          displayVolume(volume);
+        break;
+      
+      // Set the channel display 
+      case 'c': // Channel
+          channel = Wire.read();
+          displayChannel(channel);
+        break;
+        
+      // Double rainbow!
+      case '3':
+        break;
+  
+      default:
+        break; 
+        
+    } // switch
+  } // while
+} // void processResponse(int byteCount)
+
+void sendVolume() {
+  currentVol += volume->getValue();
+  
+  if (currentVol != lastVol) {
+    char vector;
+    if(currentVol > lastVol) {
+      vector = '+';
+    } else {
+      vector = '-';
+    }
+    lastVol = currentVol;
+    
+    // Send the volume vector
     Wire.beginTransmission(MAINID);
     Wire.write("V");
-    Wire.write(value);
+    Wire.write(vector);
     Wire.endTransmission();
   
-    Serial.print("Encoder Value: ");
-    Serial.println(value);
-    Serial.write(value);        
+    Serial.print("Volume: ");
+    Serial.print(vector);
+    Serial.print(" ");
+    Serial.println(currentVol);
   }
+} // void sendVolume()  
+
+void sendStation() {
+  currentCh += station->getValue();
+
+  if (currentCh != lastCh) {
+    char vector;
+    if(currentCh > lastCh) {
+      vector = '+';
+    } else {
+      vector = '-';
+    }
+    lastCh = currentCh;
+    
+    // Send the channel vector
+    Wire.beginTransmission(MAINID);
+    Wire.write("C");
+    Wire.write(vector);
+    Wire.endTransmission();
   
+    Serial.print("Channel: ");
+    Serial.print(vector);
+    Serial.print(" ");
+    Serial.println(currentCh);
+
+  }
+} // void sendVolume()  
+
+void displayVolume(int volume) {
+  Serial.print("Setting volume to: ");
+  Serial.println(volume);
   
-  //
-  // Volume Button Click  
-  //
-  ClickEncoder::Button b = station->getButton();
+  int volInc = 14; // roughly 1/7th of 100
+  int volFull = volume / volInc; // How many at full brightness
+  int volRem = volume % volInc;
+  int volPart = volRem * 128 / volInc;
+
+  Serial.print("Number full: ");
+  Serial.println(volFull);
+  Serial.print("Number Rem: ");
+  Serial.println(volRem);
+  Serial.print("Number part: ");
+  Serial.println(volPart);
+
+  int i = 0; // iniitalize the loop but keep the scope outside for the after bit  
+  for(i=0 ; i < volFull ; i++) {
+    strip.setPixelColor(i, strip.Color(0, 128, 0));
+  }
+  strip.setPixelColor(i, strip.Color(0, volPart, 0)); 
+  strip.show();
+} // void displayVolume()
+
+void displayChannel(int channel) {
+  strip.setPixelColor(channel, strip.Color(128, 0, 0));
+  strip.show();
+} // void displayChannel()
+
+void processVolButton() {
+
+  ClickEncoder::Button b = volume->getButton();
   if (b != ClickEncoder::Open) {
     Serial.print("Button: ");
     #define VERBOSECASE(label) case label: Serial.println(#label); break;
@@ -104,7 +224,7 @@ void loop() {
       //VERBOSECASE(ClickEncoder::Clicked)
       case ClickEncoder::Clicked:
           clickCount++;
-          showPixel(value);
+          //showPixel(value);
           Serial.println("Clicked");
           Serial.print("Count: ");
           Serial.println(clickCount);
@@ -117,61 +237,9 @@ void loop() {
         break;
     } // switch (b)
   } // if (b != ClickEncoder::Open)
-  
-} // void loop()
+} // void processVolButton()
 
-void processResponse(int byteCount) {
-  int volT, volO, volume, channel;
-  
-  while(Wire.available()) {
-    // Pull the action code
-    char action = Wire.read();
-    
-    // Choose your own adventure
-    switch(action) {
-      
-      // Set the volume display
-      case 'v':
-          volT = Wire.read();
-          volO = Wire.read();
-          volume = (volT * 10) + volO;
-          displayVolume(volume);
-        break;
-      
-      // Set the channel display 
-      case 'c':
-          channel = Wire.read();
-          displayChannel(channel);
-        break;
-        
-      // Double rainbow!
-      case 'r':
-        break;
-  
-      default:
-        break; 
-        
-    } // switch
-  } // while
-} // void processResponse(int byteCount)
-
-void displayVolume(int volume) {
-  int volInc = 14; // roughly 1/7th of 100
-  int volFull = volume / 14; // How many at full brightness
-  int volPart = (volume%14)/14 * 255; // Percentage of full to light last pixel
-
-  int i = 0; // iniitalize the loop but keep the scope outside for the after bit  
-  for(i=0 ; i < volFull ; i++) {
-    strip.setPixelColor(i, strip.Color(0, 128, 0));
-  }
-  strip.setPixelColor(i, strip.Color(0, volPart, 0)); 
-  strip.show();
-} // void displayVolume()
-
-void displayChannel(int channel) {
-  strip.setPixelColor(channel, strip.Color(128, 0, 0));
-  strip.show();
-} // void displayChannel()
+void processChButton() {}
 
 void showPixel(int which) {
   uint32_t pixelColor;
