@@ -5,15 +5,13 @@
 #include <Adafruit_NeoPixel.h>
 #include <ClickEncoder.h>
 #include <TimerOne.h>
-#include <Wire.h>
 
 #define PIX_PIN 3
 #define PIN_COUNT 7
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIN_COUNT, PIX_PIN, NEO_GRB + NEO_KHZ800);
 
-// Wire IDs
-#define BOARDID 0x17 // The I/O Board
-#define MAINID  0x03 // The Host Computer
+// Serial buffer size
+#define BUFFSIZE 32
 
 // Rotary encoders for volume and channel
 ClickEncoder *station;
@@ -40,84 +38,61 @@ void setup() {
   // For debugging via Serial Monitor
   Serial.begin(9600);
   
-  // I2C Setup
-  Wire.begin(BOARDID); // Join I2C bus
-  Wire.onReceive(processResponse); // register event
-
   // Create both rotary encoders
-  station = new ClickEncoder(A1, A0, A2, 4);
-  volume = new ClickEncoder(A3, A4, A5);
+  station = new ClickEncoder(A1, A0, 13, 4);
+  volume = new ClickEncoder(A2, A3, 12);
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
   
   // Initial values of globals
   lastCh = -1;
   lastVol = -1;
+  
 } // void setup()
 
 void loop() {  
-  
+  int l;
+  char n;
+  int dT, dO;
+
   sendStation();
   sendVolume();
   processVolButton();
   processChButton();
-  
+
+  char serialdata[BUFFSIZE+3];
+  int lf = 10;
+  if(Serial.available()) {
+    Serial.readBytesUntil(lf, serialdata, BUFFSIZE);
+    n = serialdata[0];
+    blankBoard();
+    
+    switch(n) {
+      case 'C':
+          l = serialdata[1] - 48;
+          Serial.print("Setting Channel to: ");
+          Serial.println(l);
+          displayChannel(l);
+        break;
+      
+      case 'V':
+          dT = serialdata[1] - 48;
+          dO = serialdata[2] - 48;
+          l = dT*10 + dO;
+          Serial.print("Setting volume to: ");
+          Serial.println(l);
+          displayVolume(l);
+        break;
+      
+      default:
+          blankBoard();
+        break;
+    } // switch
+  } // if serial available
+ 
   
 } // void loop()
 
-
-void processResponseOld(int byteCount) {
-  
-  while(Wire.available()) {
-    // Pull the action code
-    int input = Wire.read();
-    Serial.print("Received: ");
-    Serial.println(input);
-  }
-}    
-
-void processResponse(int byteCount) {
-  int volT, volO, volume, channel;
-  
-  while(Wire.available()) {
-    // Pull the action code
-    char action = Wire.read();
-    Serial.print("Action: ");
-    Serial.println(action);
-    
-    // Choose your own adventure
-    switch(action) {
-      
-      // Set the volume display
-      case 'v': // Volume
-          //volT = Wire.read();
-          //volO = Wire.read();
-          volume = Wire.read();
-          Serial.print("Volume: ");
-          //Serial.print(volT);
-          //Serial.print(volO);
-          //volume = (volT * 10) + volO;
-          Serial.print(" = ");
-          Serial.println(volume);
-          displayVolume(volume);
-        break;
-      
-      // Set the channel display 
-      case 'c': // Channel
-          channel = Wire.read();
-          displayChannel(channel);
-        break;
-        
-      // Double rainbow!
-      case '3':
-        break;
-  
-      default:
-        break; 
-        
-    } // switch
-  } // while
-} // void processResponse(int byteCount)
 
 void sendVolume() {
   currentVol += volume->getValue();
@@ -132,11 +107,8 @@ void sendVolume() {
     lastVol = currentVol;
     
     // Send the volume vector
-    Wire.beginTransmission(MAINID);
-    Wire.write("V");
-    Wire.write(vector);
-    Wire.endTransmission();
   
+    // Debug may have to go for Serial communication
     Serial.print("Volume: ");
     Serial.print(vector);
     Serial.print(" ");
@@ -157,11 +129,8 @@ void sendStation() {
     lastCh = currentCh;
     
     // Send the channel vector
-    Wire.beginTransmission(MAINID);
-    Wire.write("C");
-    Wire.write(vector);
-    Wire.endTransmission();
   
+    // Debug may have to go for Serial communication
     Serial.print("Channel: ");
     Serial.print(vector);
     Serial.print(" ");
@@ -195,7 +164,7 @@ void displayVolume(int volume) {
 } // void displayVolume()
 
 void displayChannel(int channel) {
-  strip.setPixelColor(channel, strip.Color(128, 0, 0));
+  strip.setPixelColor(channel-1, strip.Color(128, 0, 0));
   strip.show();
 } // void displayChannel()
 
@@ -318,4 +287,11 @@ uint32_t Wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+void blankBoard() {
+  for(int i=0 ; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, strip.Color(0,0,0));
+  }
+  strip.show();
 }
