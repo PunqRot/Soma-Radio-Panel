@@ -53,7 +53,8 @@ void setup() {
 void loop() {  
   int l;
   char n;
-  int dT, dO;
+  int dH, dT, dO;
+  int s;
 
   sendStation();
   sendVolume();
@@ -84,6 +85,36 @@ void loop() {
           displayVolume(l);
         break;
       
+      case 'R':
+          dH = serialdata[1] - 48;
+          dT = serialdata[2] - 48;
+          dO = serialdata[3] - 48;
+          l = dH*100 + dT*10 + dO;
+          Serial.print("Rainbow Speed: ");
+          Serial.println(l);
+          rainbow(l);
+        break;
+
+      case 'r':
+          dH = serialdata[1] - 48;
+          dT = serialdata[2] - 48;
+          dO = serialdata[3] - 48;
+          l = dH*100 + dT*10 + dO;
+          Serial.print("Cycle Speed: ");
+          Serial.println(l);
+          rainbowCycle(l);
+        break;
+
+      case 'L':
+          dH = serialdata[1] - 48;
+          dT = serialdata[2] - 48;
+          dO = serialdata[3] - 48;
+          l = dH*100 + dT*10 + dO;
+          Serial.print("Larson Scanner: ");
+          Serial.println(l);
+          larsonScanner(l);
+        break;
+
       default:
           blankBoard();
         break;
@@ -169,7 +200,8 @@ void displayChannel(int channel) {
 } // void displayChannel()
 
 void processVolButton() {
-
+  static int holdCount=0;
+  
   ClickEncoder::Button b = volume->getButton();
   if (b != ClickEncoder::Open) {
     Serial.print("Button: ");
@@ -294,4 +326,31 @@ void blankBoard() {
     strip.setPixelColor(i, strip.Color(0,0,0));
   }
   strip.show();
+}
+
+void larsonScanner(int times) {
+  for(int t=0; t<times; t++) {
+    for(int i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, strip.Color(255,0,0));
+      strip.setPixelColor(i-1, strip.Color(64,0,0));
+      strip.setPixelColor(i-2, strip.Color(16,0,0));
+      strip.setPixelColor(i-3, strip.Color(0,0,0));
+      strip.show();
+      if(i<strip.numPixels()-1) {
+        delay(100);
+      }
+      blankBoard();
+    }
+    for(int i=strip.numPixels()-1; i>-1; i--) {
+      strip.setPixelColor(i, strip.Color(255,0,0));
+      strip.setPixelColor(i+1, strip.Color(64,0,0));
+      strip.setPixelColor(i+2, strip.Color(16,0,0));
+      strip.setPixelColor(i+3, strip.Color(0,0,0));
+      strip.show();
+      if(i>0) {
+        delay(100);
+      }
+      blankBoard();
+    }
+  }
 }
