@@ -39,7 +39,7 @@ void setup() {
   Serial.begin(9600);
   
   // Create both rotary encoders
-  station = new ClickEncoder(A1, A0, 13, 4);
+  station = new ClickEncoder(A1, A0, 4, 4);
   volume = new ClickEncoder(A2, A3, 12);
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
@@ -56,15 +56,13 @@ void loop() {
   int dH, dT, dO;
   int s;
 
-  sendStation();
-  sendVolume();
-  processVolButton();
-  processChButton();
-
-  char serialdata[BUFFSIZE+3];
+  //
+  // Pi I/O - Or.. Pi/O?
+  //
+  char serialdata[BUFFSIZE+3] = "";
   int lf = 10;
   if(Serial.available()) {
-    Serial.readBytesUntil(lf, serialdata, BUFFSIZE);
+    Serial.readBytesUntil(lf, serialdata, BUFFSIZE);    
     n = serialdata[0];
     blankBoard();
     
@@ -120,55 +118,78 @@ void loop() {
         break;
     } // switch
   } // if serial available
- 
-  
-} // void loop()
 
-
-void sendVolume() {
+  //
+  // Process Volume  
+  //
   currentVol += volume->getValue();
-  
   if (currentVol != lastVol) {
-    char vector;
+    char volVector;
     if(currentVol > lastVol) {
-      vector = '+';
+      volVector = 'V';
     } else {
-      vector = '-';
+      volVector = 'v';
     }
-    lastVol = currentVol;
-    
-    // Send the volume vector
-  
-    // Debug may have to go for Serial communication
-    Serial.print("Volume: ");
-    Serial.print(vector);
-    Serial.print(" ");
-    Serial.println(currentVol);
+    lastVol = currentVol;    
+    Serial.print(volVector);
   }
-} // void sendVolume()  
 
-void sendStation() {
+  //
+  // Send Station
+  //
   currentCh += station->getValue();
-
   if (currentCh != lastCh) {
     char vector;
     if(currentCh > lastCh) {
-      vector = '+';
+      vector = 'C';
     } else {
-      vector = '-';
+      vector = 'c';
     }
-    lastCh = currentCh;
-    
-    // Send the channel vector
-  
-    // Debug may have to go for Serial communication
-    Serial.print("Channel: ");
+    lastCh = currentCh;    
     Serial.print(vector);
-    Serial.print(" ");
-    Serial.println(currentCh);
+  } // if channel change
+  
+  //
+  // Volume Button
+  //
+  ClickEncoder::Button b = volume->getButton();
+  if (b != ClickEncoder::Open) {
+    Serial.print("Button: ");
+    #define VERBOSECASE(label) case label: Serial.println(#label); break;
+    switch (b) {
+      VERBOSECASE(ClickEncoder::Pressed);
+      //VERBOSECASE(ClickEncoder::Held)
+      //VERBOSECASE(ClickEncoder::Released)
+      case ClickEncoder::Held:
+          if(holdCount > 50) {
+            Serial.println("Initiate Shutdown");
+          } else {
+            holdCount++;
+            Serial.print("Held for: ");
+            Serial.println(holdCount);
+          }
+        break;
+      case ClickEncoder::Released:
+          holdCount = 0;
+        break;      
+      //VERBOSECASE(ClickEncoder::Clicked)
+      case ClickEncoder::Clicked:
+          clickCount++;
+          //showPixel(value);
+          Serial.println("Clicked");
+          Serial.print("Count: ");
+          Serial.println(clickCount);
+        break;
+      case ClickEncoder::DoubleClicked:
+          Serial.println("ClickEncoder::DoubleClicked");
+          station->setAccelerationEnabled(!station->getAccelerationEnabled());
+          Serial.print("  Acceleration is ");
+          Serial.println((station->getAccelerationEnabled()) ? "enabled" : "disabled");
+        break;
+    } // switch (b)
+  } // if (b != ClickEncoder::Open)
 
-  }
-} // void sendVolume()  
+} // Loop
 
 void displayVolume(int volume) {
   Serial.print("Setting volume to: ");
@@ -198,49 +219,6 @@ void displayChannel(int channel) {
   strip.setPixelColor(channel-1, strip.Color(128, 0, 0));
   strip.show();
 } // void displayChannel()
-
-void processVolButton() {
-  static int holdCount=0;
-  
-  ClickEncoder::Button b = volume->getButton();
-  if (b != ClickEncoder::Open) {
-    Serial.print("Button: ");
-    #define VERBOSECASE(label) case label: Serial.println(#label); break;
-    switch (b) {
-      VERBOSECASE(ClickEncoder::Pressed);
-      //VERBOSECASE(ClickEncoder::Held)
-      //VERBOSECASE(ClickEncoder::Released)
-      case ClickEncoder::Held:
-          if(holdCount > 5000) {
-            Serial.println("Initiate Shutdown");
-          } else {
-            holdCount++;
-            Serial.print("Held for: ");
-            Serial.println(holdCount);
-          }
-        break;
-      case ClickEncoder::Released:
-          holdCount = 0;
-        break;      
-      //VERBOSECASE(ClickEncoder::Clicked)
-      case ClickEncoder::Clicked:
-          clickCount++;
-          //showPixel(value);
-          Serial.println("Clicked");
-          Serial.print("Count: ");
-          Serial.println(clickCount);
-        break;
-      case ClickEncoder::DoubleClicked:
-          Serial.println("ClickEncoder::DoubleClicked");
-          station->setAccelerationEnabled(!station->getAccelerationEnabled());
-          Serial.print("  Acceleration is ");
-          Serial.println((station->getAccelerationEnabled()) ? "enabled" : "disabled");
-        break;
-    } // switch (b)
-  } // if (b != ClickEncoder::Open)
-} // void processVolButton()
-
-void processChButton() {}
 
 void showPixel(int which) {
   uint32_t pixelColor;
