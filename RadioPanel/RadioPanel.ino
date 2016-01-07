@@ -69,8 +69,6 @@ void loop() {
     switch(n) {
       case 'C':
           l = serialdata[1] - 48;
-          Serial.print("Setting Channel to: ");
-          Serial.println(l);
           displayChannel(l);
         break;
       
@@ -78,8 +76,6 @@ void loop() {
           dT = serialdata[1] - 48;
           dO = serialdata[2] - 48;
           l = dT*10 + dO;
-          Serial.print("Setting volume to: ");
-          Serial.println(l);
           displayVolume(l);
         break;
       
@@ -88,8 +84,6 @@ void loop() {
           dT = serialdata[2] - 48;
           dO = serialdata[3] - 48;
           l = dH*100 + dT*10 + dO;
-          Serial.print("Rainbow Speed: ");
-          Serial.println(l);
           rainbow(l);
         break;
 
@@ -98,8 +92,6 @@ void loop() {
           dT = serialdata[2] - 48;
           dO = serialdata[3] - 48;
           l = dH*100 + dT*10 + dO;
-          Serial.print("Cycle Speed: ");
-          Serial.println(l);
           rainbowCycle(l);
         break;
 
@@ -108,8 +100,6 @@ void loop() {
           dT = serialdata[2] - 48;
           dO = serialdata[3] - 48;
           l = dH*100 + dT*10 + dO;
-          Serial.print("Larson Scanner: ");
-          Serial.println(l);
           larsonScanner(l);
         break;
 
@@ -154,7 +144,6 @@ void loop() {
   //
   ClickEncoder::Button b = volume->getButton();
   if (b != ClickEncoder::Open) {
-    Serial.print("Button: ");
     #define VERBOSECASE(label) case label: Serial.println(#label); break;
     switch (b) {
       VERBOSECASE(ClickEncoder::Pressed);
@@ -162,11 +151,11 @@ void loop() {
       //VERBOSECASE(ClickEncoder::Released)
       case ClickEncoder::Held:
           if(holdCount > 50) {
-            Serial.println("Initiate Shutdown");
+            //
+            // This will need to signal a GPIO or something to perform shutdown
+            //
           } else {
             holdCount++;
-            Serial.print("Held for: ");
-            Serial.println(holdCount);
           }
         break;
       case ClickEncoder::Released:
@@ -175,16 +164,8 @@ void loop() {
       //VERBOSECASE(ClickEncoder::Clicked)
       case ClickEncoder::Clicked:
           clickCount++;
-          //showPixel(value);
-          Serial.println("Clicked");
-          Serial.print("Count: ");
-          Serial.println(clickCount);
         break;
       case ClickEncoder::DoubleClicked:
-          Serial.println("ClickEncoder::DoubleClicked");
-          station->setAccelerationEnabled(!station->getAccelerationEnabled());
-          Serial.print("  Acceleration is ");
-          Serial.println((station->getAccelerationEnabled()) ? "enabled" : "disabled");
         break;
     } // switch (b)
   } // if (b != ClickEncoder::Open)
@@ -192,20 +173,10 @@ void loop() {
 } // Loop
 
 void displayVolume(int volume) {
-  Serial.print("Setting volume to: ");
-  Serial.println(volume);
-  
   int volInc = 14; // roughly 1/7th of 100
   int volFull = volume / volInc; // How many at full brightness
   int volRem = volume % volInc;
   int volPart = volRem * 128 / volInc;
-
-  Serial.print("Number full: ");
-  Serial.println(volFull);
-  Serial.print("Number Rem: ");
-  Serial.println(volRem);
-  Serial.print("Number part: ");
-  Serial.println(volPart);
 
   int i = 0; // iniitalize the loop but keep the scope outside for the after bit  
   for(i=0 ; i < volFull ; i++) {
@@ -249,10 +220,6 @@ void showPixel(int which) {
   strip.setPixelColor(which, pixelColor);
   strip.show();
 
-  Serial.print("Setting pixel ");
-  Serial.print(which);
-  Serial.print(" to ");
-  Serial.println(pixelColor);  
 } // void showPixel()
 
 //
