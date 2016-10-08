@@ -57,63 +57,6 @@ void loop() {
   int dH, dT, dO;
   int s;
 
-  // This was unneccesary. The delay was casued by serial timeout due to lack of EOT character
-  // The services for the rotary library are no longer interrupts.
-  //station->service();
-  //volume->service();
-
-  //
-  // Pi I/O - Or.. Pi/O?
-  //
-  char serialdata[BUFFSIZE+3] = "";
-  int lf = 10;
-  if(Serial.available()) {
-    Serial.readBytesUntil('\0', serialdata, BUFFSIZE);    
-    n = serialdata[0];
-    
-    switch(n) {
-      case 'C':
-          l = serialdata[1] - 48;
-          displayChannel(l);
-        break;
-      
-      case 'V':
-          dT = serialdata[1] - 48;
-          dO = serialdata[2] - 48;
-          l = dT*10 + dO;
-          displayVolume(l);
-        break;
-      
-      case 'R':
-          dH = serialdata[1] - 48;
-          dT = serialdata[2] - 48;
-          dO = serialdata[3] - 48;
-          l = dH*100 + dT*10 + dO;
-          rainbow(l);
-        break;
-
-      case 'r':
-          dH = serialdata[1] - 48;
-          dT = serialdata[2] - 48;
-          dO = serialdata[3] - 48;
-          l = dH*100 + dT*10 + dO;
-          rainbowCycle(l);
-        break;
-
-      case 'L':
-          dH = serialdata[1] - 48;
-          dT = serialdata[2] - 48;
-          dO = serialdata[3] - 48;
-          l = dH*100 + dT*10 + dO;
-          larsonScanner(l);
-        break;
-
-      default:
-          blankBoard();
-        break;
-    } // switch
-  } // if serial available
-
   //
   // Process Volume  
   //
@@ -125,25 +68,11 @@ void loop() {
     } else {
       volVector = 'v';
     }
-    lastVol = currentVol;    
+    lastVol = currentVol;
+    displayVolume(currentVol);    
     Serial.print(volVector);
   }
 
-  //
-  // Send Station
-  //
-  currentCh += station->getValue();
-  if (currentCh != lastCh) {
-    char vector;
-    if(currentCh > lastCh) {
-      vector = 'C';
-    } else {
-      vector = 'c';
-    }
-    lastCh = currentCh;    
-    Serial.print(vector);
-  } // if channel change
-  
   //
   // Volume Button
   //
