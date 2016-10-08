@@ -24,7 +24,7 @@ int clickCount=0;
 int holdCount=0;
 
 // Setup interrupts for encoders
-void timerIsr() {
+void timerIsr() { 
   station->service();
   volume->service();
 }
@@ -34,13 +34,14 @@ void setup() {
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
   //rainbow(10);
+  blankBoard();
 
   // For debugging via Serial Monitor
-  Serial.begin(9600);
+  Serial.begin(115200);
   
   // Create both rotary encoders
   station = new ClickEncoder(A1, A0, 4, 4);
-  volume = new ClickEncoder(A2, A3, 12);
+  volume = new ClickEncoder(A2, A3, 5, 4);
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
   
@@ -56,15 +57,19 @@ void loop() {
   int dH, dT, dO;
   int s;
 
+  // This was unneccesary. The delay was casued by serial timeout due to lack of EOT character
+  // The services for the rotary library are no longer interrupts.
+  //station->service();
+  //volume->service();
+
   //
   // Pi I/O - Or.. Pi/O?
   //
   char serialdata[BUFFSIZE+3] = "";
   int lf = 10;
   if(Serial.available()) {
-    Serial.readBytesUntil(lf, serialdata, BUFFSIZE);    
+    Serial.readBytesUntil('\0', serialdata, BUFFSIZE);    
     n = serialdata[0];
-    blankBoard();
     
     switch(n) {
       case 'C':
@@ -178,6 +183,8 @@ void displayVolume(int volume) {
   int volRem = volume % volInc;
   int volPart = volRem * 128 / volInc;
 
+  blankBoard();
+
   int i = 0; // iniitalize the loop but keep the scope outside for the after bit  
   for(i=0 ; i < volFull ; i++) {
     strip.setPixelColor(i, strip.Color(0, 128, 0));
@@ -187,6 +194,7 @@ void displayVolume(int volume) {
 } // void displayVolume()
 
 void displayChannel(int channel) {
+  blankBoard();
   strip.setPixelColor(channel-1, strip.Color(128, 0, 0));
   strip.show();
 } // void displayChannel()
