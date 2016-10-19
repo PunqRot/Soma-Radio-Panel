@@ -23,6 +23,14 @@ int16_t lastCh, currentCh;
 int clickCount=0;
 int holdCount=0;
 
+// Variables for sending channel data on pause
+long channelPause = 0;
+bool channelSent = true;
+
+// Variables for only showing volume briefly
+long volumePause = 0;
+bool channelDisplay = true;
+
 // Setup interrupts for encoders
 void timerIsr() { 
   station->service();
@@ -33,10 +41,10 @@ void setup() {
   // Neopixel Strip Setup
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
-  //rainbow(10);
+  rainbow(10);
   blankBoard();
 
-  // For debugging via Serial Monitor
+  // Communication to Pi
   Serial.begin(115200);
   
   // Create both rotary encoders
@@ -52,33 +60,70 @@ void setup() {
 } // void setup()
 
 void loop() {  
-  int l;
-  char n;
-  int dH, dT, dO;
-  int s;
 
   //
-  // Process Volume  
+  // Change Volume  
   //
   currentVol += volume->getValue();
   if (currentVol != lastVol) {
     char volVector;
-    if(currentVol > lastVol) {
-      volVector = 'V';
-    } else {
-      volVector = 'v';
-    }
     lastVol = currentVol;
-    displayVolume(currentVol);    
-    Serial.print(volVector);
+    if(currentVol > 100) {
+      currentVol = 100;
+    }
+    if(currentVol < 0) {
+      currentVol = 0;
+    }
+    displayVolume(currentVol);
+    transmitValues();
+    channelDisplay = false;
+    volumePause = 0;  
+  } // if currentVol
+  if(channelDisplay == false) {
+    if(volumePause > 50000) {
+      displayChannel(currentCh);
+      channelDisplay = true;
+    } else {
+      volumePause++;
+    }
   }
+  
 
+  //
+  // Change Station
+  //
+  currentCh += station->getValue();
+  if (currentCh != lastCh) {
+    char vector;
+    lastCh = currentCh;
+    if(currentCh > 7) {
+      currentCh = 7;
+    }
+    if(currentCh < 1) {
+      currentCh = 1;
+    }
+    displayChannel(currentCh);
+    
+    channelSent = false;
+    channelPause = 0;
+    
+  } // if channel change
+  if(channelSent == false) {
+    if(channelPause > 500) {
+      transmitValues();
+      channelSent = true;
+    } else {
+      channelPause++;
+    }
+  }
+  
   //
   // Volume Button
   //
   ClickEncoder::Button b = volume->getButton();
   if (b != ClickEncoder::Open) {
-    #define VERBOSECASE(label) case label: Serial.println(#label); break;
+    //#define VERBOSECASE(label) case label: Serial.println(#label); break;
+    #define VERBOSECASE(label) case label: break;
     switch (b) {
       VERBOSECASE(ClickEncoder::Pressed);
       //VERBOSECASE(ClickEncoder::Held)
@@ -124,7 +169,7 @@ void displayVolume(int volume) {
 
 void displayChannel(int channel) {
   blankBoard();
-  strip.setPixelColor(channel-1, strip.Color(128, 0, 0));
+  strip.setPixelColor(channel-1, strip.Color(64, 0, 0));
   strip.show();
 } // void displayChannel()
 
@@ -235,4 +280,10 @@ void larsonScanner(int times) {
       blankBoard();
     }
   }
+}
+
+void transmitValues() {
+  Serial.print(currentCh);
+  Serial.print(currentVol);
+  Serial.println();
 }
